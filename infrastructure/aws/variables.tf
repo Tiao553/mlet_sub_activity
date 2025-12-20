@@ -31,7 +31,8 @@ variable "bucket_names" {
   type        = list(string)
   default = [
     "raw-zone",
-    "delivery-zone"
+    "delivery-zone",
+    "mlflow-artifacts"
   ]
 }
 
@@ -43,4 +44,9 @@ variable "database_names" {
     "dl-raw-zone",
     "dl-delivery-zone"
   ]
+}
+
+variable "key_name" {
+  description = "Name of the SSH key pair"
+  type        = string
 }
