@@ -3,7 +3,7 @@ variable "region_id" {
 }
 
 variable "prefix" {
-  default = "tech-challanger-4"
+  default = "sub-challanger"
 }
 
 variable "account" {
@@ -14,7 +14,7 @@ variable "account" {
 locals {
   prefix = "${var.prefix}-${terraform.workspace}"
   common_tags = {
-    Project      = "tech-challanger-2"
+    Project      = "sub-challanger"
     ManagedBy    = "Terraform"
     Department   = "TI",
     Provider     = "students",

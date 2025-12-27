@@ -16,6 +16,7 @@
 - [Fases do Projeto](#fases-do-projeto)
 - [Requisitos](#requisitos)
 - [Instalação e Execução](#instalação-e-execução)
+- [Deployment e Arquitetura](#deployment-e-arquitetura)
 - [Uso da API](#uso-da-api)
 - [Licença](#licença)
 
@@ -94,6 +95,17 @@ docker-compose up -d --build
 
 - **API**: <http://localhost:8000>
 - **MLflow UI**: <http://localhost:5000>
+
+---
+
+---
+
+## ☁️ Deployment e Arquitetura
+
+Para detalhes completos sobre a infraestrutura e como realizar o deploy na AWS, consulte nossas documentações dedicadas:
+
+- **[Guia de Deployment na AWS](docs/DEPLOYMENT.md)**: Passo a passo para subir a stack usando o script automatizado.
+- **[Arquitetura do Projeto](docs/ARCHITECTURE.md)**: Detalhes sobre os recursos AWS (EC2, S3, IAM) e serviços Docker (Airflow, MLflow).
 
 ---
 

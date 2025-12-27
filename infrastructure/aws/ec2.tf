@@ -38,9 +38,10 @@ resource "aws_security_group" "mlflow_airflow_sg" {
 }
 
 resource "aws_instance" "app_server" {
-  ami                    = "ami-0c7217cdde317cfec" # Ubuntu 22.04 LTS us-east-1
-  instance_type          = "t3.medium"
-  key_name               = var.key_name
+  ami           = "ami-0c7217cdde317cfec" # Ubuntu 22.04 LTS us-east-1
+  instance_type = "t3.medium"
+  # Use the generated key pair
+  key_name               = aws_key_pair.generated_key_pair.key_name
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.mlflow_airflow_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
@@ -70,7 +71,11 @@ resource "aws_instance" "app_server" {
               # Example (Uncomment and replace with your repo):
               git clone https://github.com/Tiao553/mlet_sub_activity.git .
               
-              cd /home/ubuntu/mlet_sub_activity
+              # Fix Airflow permissions
+              mkdir -p airflow/{dags,logs,plugins}
+              chmod -R 777 airflow
+              
+              # cd /home/ubuntu/mlet_sub_activity # Removed as we cloned into .
               
               # Assuming docker-compose.yml is present:
               docker compose up -d
