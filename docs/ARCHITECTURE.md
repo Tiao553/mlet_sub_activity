@@ -32,8 +32,9 @@ The application runs as a containerized stack managed by **Docker Compose**.
    - Artifact Store: **AWS S3** (`s3://mlflow-artifacts`).
 2. **Airflow**:
    - Orchestrates data pipelines and model training.
-   - Components: Webserver, Scheduler, Init.
    - Backend Store: Postgres.
+   - Components: Webserver, Scheduler, Init.
+   - **Git-Sync**: Sidecar container that synchronizes DAGs/Plugins from GitHub (`https://github.com/Tiao553/mlet_sub_activity.git`) to a shared volume (`git-sync-data`).
 3. **PostgreSQL**:
    - Two distinct containers for MLflow and Airflow metadata.
 
@@ -41,5 +42,6 @@ The application runs as a containerized stack managed by **Docker Compose**.
 
 1. **Deployment**: `deploy_mlflow_stack.sh` provisions the EC2 instance.
 2. **Initialization**: `user_data` script installs Docker, clones the repo, fixes permissions, and starts `docker compose up`.
-3. **Pipelines**: Airflow DAGs run ML tasks, logging metrics and models to MLflow.
-4. **Artifacts**: Models are physically stored in S3, accessible via the MLflow UI.
+3. **DAG Updates**: Pushing to the `main` branch of the repository automatically updates DAGs in Airflow (approx. 30s delay) via the Git-Sync sidecar.
+4. **Pipelines**: Airflow DAGs run ML tasks, logging metrics and models to MLflow.
+5. **Artifacts**: Models are physically stored in S3, accessible via the MLflow UI.

@@ -11,10 +11,12 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    # Git Sync Paths
+    AIRFLOW__CORE__DAGS_FOLDER: /git/repo/airflow/dags
+    AIRFLOW__CORE__PLUGINS_FOLDER: /git/repo/airflow/plugins
   volumes:
-    - ./airflow/dags:/opt/airflow/dags
     - ./airflow/logs:/opt/airflow/logs
-    - ./airflow/plugins:/opt/airflow/plugins
+    - git-sync-data:/git:ro
   depends_on:
     &airflow-common-depends-on
     postgres_airflow:
@@ -51,6 +53,23 @@ services:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
       retries: 5
+
+  # --- Git Sync ---
+  git-sync:
+    image: registry.k8s.io/git-sync/git-sync:v4.2.0
+    container_name: git_sync
+    environment:
+      - GIT_SYNC_REPO=https://github.com/Tiao553/mlet_sub_activity.git
+      - GIT_SYNC_BRANCH=main
+      - GIT_SYNC_ROOT=/git
+      - GIT_SYNC_DEST=repo
+      - GIT_SYNC_WAIT=30
+      - GIT_SYNC_ONE_TIME=false
+      # Run as root to ensure permissions on the volume, or match Airflow UID
+      # Airflow runs as 50000. Let's try to make files readable.
+      - GIT_SYNC_UID=50000
+    volumes:
+      - git-sync-data:/git
 
   # --- MLflow ---
   mlflow:
@@ -113,3 +132,4 @@ services:
 volumes:
   postgres_mlflow_data:
   postgres_airflow_data:
+  git-sync-data:

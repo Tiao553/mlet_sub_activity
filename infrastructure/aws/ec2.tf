@@ -67,17 +67,17 @@ resource "aws_instance" "app_server" {
               mkdir -p /home/ubuntu/tech-challenge
               cd /home/ubuntu/tech-challenge
               
-              # NOTE: You must either clone the repo or copy files via SCP/CI-CD.
-              # Example (Uncomment and replace with your repo):
-              git clone https://github.com/Tiao553/mlet_sub_activity.git .
+              # Clone the repo (creates mlet_sub_activity directory)
+              git clone https://github.com/Tiao553/mlet_sub_activity.git
+              
+              # Enter the project directory
+              cd mlet_sub_activity
               
               # Fix Airflow permissions
               mkdir -p airflow/{dags,logs,plugins}
               chmod -R 777 airflow
               
-              # cd /home/ubuntu/mlet_sub_activity # Removed as we cloned into .
-              
-              # Assuming docker-compose.yml is present:
+              # Initialize and start containers
               docker compose up -d
               EOF
 

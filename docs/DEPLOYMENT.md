@@ -56,7 +56,12 @@ ssh -i sub-mlet-mlairflow.pem ubuntu@<PUBLIC-IP> "docker ps"
 If Airflow fails to start with "Permission denied" errors for logs, the deployment script automatically applies the necessary permissions (`chmod 777`) to the `airflow/` directory on the instance. If you need to fix this manually on an existing instance:
 
 ```bash
-mkdir -p airflow/{dags,logs,plugins}
-chmod -R 777 airflow
 docker compose restart airflow-init
 ```
+
+**DAG Synchronization**
+Airflow is configured with a **Git-Sync** sidecar.
+
+- DAGs are automatically pulled from the `main` branch of the repository.
+- Sync interval: 30 seconds.
+- You do **not** need to manually updating the server to deploy new DAGs; just push to GitHub.
