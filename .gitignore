@@ -16,3 +16,6 @@ logs/
 .idea/
 .terraform/
 *.pem
+
+*.tfstate
+*.tfstate.backup

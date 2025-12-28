@@ -27,7 +27,7 @@ TARGETS="$TARGETS -target=aws_instance.app_server"
 TARGETS="$TARGETS -target=local_file.private_key_pem"
 # Targeting all buckets to ensure mlflow-artifacts is created. 
 # Terraform will not destroy existing ones unless config changed.
-# TARGETS="$TARGETS -target=aws_s3_bucket.buckets"
+TARGETS="$TARGETS -target=aws_s3_bucket.buckets"
 
 echo "Deploying MLflow/Airflow Infrastructure..."
 echo "Targets: $TARGETS"
