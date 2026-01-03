@@ -14,6 +14,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__PLUGINS_FOLDER: /git/repo/airflow/plugins
   volumes:
     - ./airflow/logs:/opt/airflow/logs
+    - ./models:/opt/airflow/models # Mount models for DAG execution
     - git-sync-data:/git:ro
   depends_on: &airflow-common-depends-on
     postgres_airflow:
@@ -90,6 +91,9 @@ services:
     depends_on:
       postgres_mlflow:
         condition: service_healthy
+
+
+
 
   # --- Airflow ---
   airflow-init:

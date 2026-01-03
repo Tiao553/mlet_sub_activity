@@ -149,47 +149,16 @@ def main():
     mlflow.set_tracking_uri(args.mlflow_uri)
     
     # Dynamic Experiment Name based on Business Keys
-    experiment_name = f"Experiment_{args.symbol}_{args.period}_{args.interval}"
+    experiment_name = f"Experiment_{args.symbol}_{args.period}_{args.interval}_v2"
     mlflow.set_experiment(experiment_name)
-    
-    # 2. Data Loading
-    print(f"Downloading {args.symbol}...")
-    df = yf.download(args.symbol, period=args.period, interval=args.interval, progress=False)
-    # Fix for multi-index columns if present
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.droplevel(1)
-            
-    df = add_technical_indicators(df, args.feature_set)
-    
-    # Select Features
-    features = ['Close', 'High', 'Low', 'Volume', 'RSI', 'EMA_20']
-    if args.feature_set == "full":
-        features.extend(['Stoch_K', 'MACD', 'BB_upper', 'ATR', 'OBV'])
-    
-    # Ensure features exist
-    features = [f for f in features if f in df.columns]
-    print(f"Features: {features}")
-    
-    dataset = df[features].values
-    scaler = MinMaxScaler()
-    scaled_data = scaler.fit_transform(dataset)
-    
-    X, y = create_sequences(scaled_data, args.sequence_length)
-    
-    # Train/Test Split
-    split = int(len(X) * 0.8)
-    X_train, X_test = X[:split], X[split:]
-    y_train, y_test = y[:split], y[split:]
-    
-    # Registered Model Name uses the same business keys
-    reg_model_name = f"model_{args.symbol}_{args.period}_{args.interval}"
     
     import datetime
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     run_name = f"{args.symbol}_{args.period}_{args.interval}_{args.framework}_{timestamp}"
-    
+
+    # START RUN EARLY to capture everything
     with mlflow.start_run(run_name=run_name) as run:
-        # Log all args
+        # Log all args immediately
         for arg, value in vars(args).items():
             mlflow.log_param(arg, value)
             
@@ -198,7 +167,91 @@ def main():
         mlflow.set_tag("period", args.period)
         mlflow.set_tag("interval", args.interval)
         mlflow.set_tag("framework", args.framework)
-        mlflow.set_tag("environment", "dev") # Mark as potential candidate
+        mlflow.set_tag("environment", "dev")
+
+        print(f"Downloading {args.symbol}...")
+        try:
+            df = yf.download(args.symbol, period=args.period, interval=args.interval, progress=False)
+        except Exception as e:
+            print(f"Error downloading data: {e}")
+            mlflow.set_tag("param_trace", "download_error")
+            return
+
+        # Check if data was returned
+        if df.empty:
+             msg = f"No data returned for {args.symbol} ({args.period}/{args.interval})"
+             print(f"WARNING: {msg}. Skipping.")
+             mlflow.set_tag("skip_reason", "empty_data_from_api")
+             return
+
+        # Fix for multi-index columns if present
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.droplevel(1)
+            
+        # Check if data is sufficient for indicators (Window=26 is max for MACD, plus some buffer)
+        if len(df) < 35:
+            msg = f"Data length ({len(df)}) too short for technical indicators (min 35)"
+            print(f"WARNING: {msg}. Skipping {args.symbol} {args.period}/{args.interval}.")
+            mlflow.set_tag("skip_reason", "insufficient_data_length")
+            mlflow.log_param("data_length", len(df))
+            return
+
+        try:
+            df = add_technical_indicators(df, args.feature_set)
+        except Exception as e:
+            print(f"Indicator Error: {e}")
+            mlflow.set_tag("skip_reason", "indicator_calculation_error")
+            return
+        
+        # Check if data survived indicator generation (dropna)
+        min_required_len = args.sequence_length + 10 # Need at least seq_len + some data for split
+        if len(df) < min_required_len:
+            msg = f"Insufficient data after indicators ({len(df)} < {min_required_len})"
+            print(f"WARNING: {msg} for {args.symbol}. Skipping.")
+            mlflow.set_tag("skip_reason", "insufficient_data_after_preprocessing")
+            mlflow.log_param("processed_len", len(df))
+            return
+
+        # Select Features
+        features = ['Close', 'High', 'Low', 'Volume', 'RSI', 'EMA_20']
+        if args.feature_set == "full":
+            features.extend(['Stoch_K', 'MACD', 'BB_upper', 'ATR', 'OBV'])
+        
+        # Ensure features exist
+        features = [f for f in features if f in df.columns]
+        print(f"Features: {features}")
+        
+        dataset = df[features].values
+        
+        # Check for NaNs/Infs
+        if np.isnan(dataset).any() or np.isinf(dataset).any():
+             print("WARNING: Dataset contains NaNs or Infs after pre-processing. filling with 0")
+             dataset = np.nan_to_num(dataset)
+
+        scaler = MinMaxScaler()
+        scaled_data = scaler.fit_transform(dataset)
+        
+        X, y = create_sequences(scaled_data, args.sequence_length)
+        
+        if len(X) == 0:
+            print(f"WARNING: No sequences created for {args.symbol} (len={len(df)}, seq_len={args.sequence_length}). Skipping.")
+            mlflow.set_tag("skip_reason", "no_sequences_created")
+            return
+
+        # Train/Test Split
+        split = int(len(X) * 0.8)
+        
+        # Ensure there is at least 1 train and 1 test sample
+        if split == 0 or split == len(X):
+            print(f"WARNING: Insufficient samples for split ({len(X)} samples). Skipping.")
+            mlflow.set_tag("skip_reason", "insufficient_samples_for_split")
+            return
+
+        X_train, X_test = X[:split], X[split:]
+        y_train, y_test = y[:split], y[split:]
+        
+        # Registered Model Name uses the same business keys
+        reg_model_name = f"model_{args.symbol}_{args.period}_{args.interval}"
 
         # Train & Evaluate
         rmse, mae = 0, 0
@@ -228,19 +281,29 @@ def main():
                 mae = mean_absolute_error(y_test_inv, preds_inv)
                 
                 try:
-                    # Log and Register
-                    mlflow.tensorflow.log_model(
+                    # 1. Log Model (Artifacts to S3)
+                    model_info = mlflow.tensorflow.log_model(
                         model, 
-                        "model",
-                        registered_model_name=reg_model_name
+                        "model"
                     )
+                    
+                    # 2. Register Model (Metadata to DB)
+                    try:
+                        mlflow.register_model(
+                            model_uri=model_info.model_uri,
+                            name=reg_model_name
+                        )
+                    except Exception as reg_error:
+                         print(f"Warning: Failed to Register TF model: {reg_error}")
+
                 except Exception as e:
                     print(f"Warning: Failed to log TF model artifact: {e}")
                 
             except Exception as e:
                 print(f"TF Error: {e}")
                 mlflow.log_param("error", str(e))
-                raise e
+                # Don't raise, just log error so next trial continues
+                pass
 
         elif args.framework == "pytorch":
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -278,12 +341,21 @@ def main():
             mae = mean_absolute_error(y_test_inv, preds_inv)
             
             try:
-                # Log and Register
-                mlflow.pytorch.log_model(
+                # 1. Log Model (Artifacts to S3)
+                model_info = mlflow.pytorch.log_model(
                     model, 
-                    "model",
-                    registered_model_name=reg_model_name
+                    "model"
                 )
+                
+                # 2. Register Model (Metadata to DB)
+                try:
+                    mlflow.register_model(
+                        model_uri=model_info.model_uri,
+                        name=reg_model_name
+                    )
+                except Exception as reg_error:
+                        print(f"Warning: Failed to Register PyTorch model: {reg_error}")
+                        
             except Exception as e:
                 print(f"Warning: Failed to log PyTorch model artifact: {e}")
 

@@ -37,3 +37,5 @@ yfinance==0.2.61
 boto3
 mangum
 tensorflow
+mlflow
+boto3

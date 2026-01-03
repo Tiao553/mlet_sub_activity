@@ -8,6 +8,7 @@ from ta.trend import MACD, CCIIndicator, ADXIndicator, EMAIndicator
 from ta.volatility import BollingerBands, AverageTrueRange
 from ta.volume import OnBalanceVolumeIndicator, AccDistIndexIndicator
 from ta.volume import VolumeWeightedAveragePrice
+import mlflow.pyfunc
 
 from app.services.s3_utils import read_csv_from_s3
 from app.config.logger import setup_logger
@@ -15,7 +16,7 @@ from app.config.logger import setup_logger
 logger = setup_logger("predictor")
 
 # Caminho do modelo
-MODEL_PATH = "api/app/model/modelo_v1.h5"
+# Caminho do modelo
 BUCKET_NAME = "tech-challanger-4-prd-raw-zone-593793061865"
 SEQ_LENGTH = 24 
 
@@ -26,16 +27,54 @@ def create_sequences(data, seq_length):
         y.append(data[i + seq_length, 0])  # Close price na posição 0
     return np.array(X), np.array(y)
 
+MODEL_CACHE = {}
+
 # --- Função para carregar e prever ---
-def predict_next_price(model_path: str, data: np.ndarray) -> Optional[float]:
+def get_model_dynamic(symbol: str, period: str, interval: str):
+    """
+    Carrega o modelo do MLflow baseado nos parÃ¢metros.
+    Nome do modelo: model_{symbol}_{period}_{interval}
+    Alias: @champion
+    """
+    # Defaults caso venha None
+    # (Ajuste conforme a lógica de negócio ou garanta que a API passe valores válidos)
+    p = period if period else "1y"
+    i = interval if interval else "1d"
+    
+    # Sanitização básica (ex: remover .SA se o nome do modelo não usar, mas assumindo que usa)
+    model_name = f"model_{symbol}_{p}_{i}"
+    model_uri = f"models:/{model_name}@champion"
+    
+    if model_uri in MODEL_CACHE:
+        return MODEL_CACHE[model_uri]
+        
     try:
-        logger.info(f"Carregando o modelo de: {model_path}")
-        model = load_model(model_path, compile=False)
-        logger.info("Modelo carregado com sucesso.")
+        logger.info(f"Tentando carregar modelo do MLflow: {model_uri}")
+        model = mlflow.pyfunc.load_model(model_uri)
+        MODEL_CACHE[model_uri] = model
+        logger.info("Modelo carregado e cacheado com sucesso.")
+        return model
+    except Exception as e:
+        logger.error(f"Falha ao carregar modelo {model_uri}: {e}")
+        return None
+
+def predict_next_price(model, data: np.ndarray) -> Optional[float]:
+    try:
+        # MLflow pyfunc predict espera array ou dataframe
         prediction = model.predict(data)
-        return float(prediction[0][0])
-    except FileNotFoundError:
-        logger.error(f"Arquivo de modelo não encontrado em '{model_path}'.")
+        
+        # Tratamento de retorno (pode ser array, lista, ou dataframe)
+        if isinstance(prediction, pd.DataFrame):
+            val = prediction.iloc[0, 0]
+        elif isinstance(prediction, np.ndarray):
+            val = prediction.flat[0]
+        elif isinstance(prediction, list):
+            val = prediction[0]
+        else:
+            val = float(prediction)
+            
+        return float(val)
+
     except Exception as e:
         logger.exception(f"Erro durante a predição: {e}")
     return None
@@ -90,6 +129,8 @@ def pipe_to_predict(
     symbol: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    period: Optional[str] = None,
+    interval: Optional[str] = None,
 ) -> Optional[float]:
     try:
         logger.info(f"Lendo dados do S3 para o símbolo: {symbol}")
@@ -151,8 +192,15 @@ def pipe_to_predict(
         # Pega a última sequência para previsão
         last_sequence = X[-1].reshape(1, SEQ_LENGTH, len(features))
 
-        logger.info(f"Realizando predição com sequência de shape {last_sequence.shape}.")
-        return predict_next_price(MODEL_PATH, last_sequence)
+        # Carregar modelo dinamicamente
+        model = get_model_dynamic(symbol, period, interval)
+        if not model:
+            # Fallback ou erro
+            logger.error(f"Não foi possível carregar modelo para {symbol} period={period} interval={interval}")
+            return None
+
+        logger.info(f"Realizando predição com modelo MLflow. shape {last_sequence.shape}.")
+        return predict_next_price(model, last_sequence)
     
     except Exception as e:
         logger.exception(f"Erro na execução do pipeline de predição: {e}")

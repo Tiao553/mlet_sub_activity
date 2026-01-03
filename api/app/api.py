@@ -27,7 +27,7 @@ def stock_data_endpoint(
         try:
             msg = fetch_and_save_s3(symbol, start_date, end_date_str, interval, period, auto_adjust)
             if 200 in msg:
-                return pipe_to_predict(symbol, start_date, end_date_str)
+                return pipe_to_predict(symbol, start_date, end_date_str, period, interval)
         except  Exception as e:
             logger.error(f"Erro ao buscar dados do Yahoo Finance: {e}")
             raise {"error": str(e)}

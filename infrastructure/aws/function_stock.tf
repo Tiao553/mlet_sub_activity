@@ -12,11 +12,13 @@ resource "aws_lambda_function" "crawler_lambda" {
   tags = merge(
     local.common_tags,
   )
-  
+
   environment {
     variables = {
       API_GATEWAY_ROOT_PATH = "/prod"
       STAGE                 = "prod"
+      MLFLOW_TRACKING_URI   = "http://ec2-url:5000" # TO BE REPLACED WITH REAL EC2 URL/IP IN PROD
+      MLFLOW_BUCKET_NAME    = "sub-challanger-prd-mlflow-artifacts-593793061865"
     }
   }
 
