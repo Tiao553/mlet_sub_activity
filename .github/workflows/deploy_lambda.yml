@@ -7,8 +7,8 @@ on:
 
 env:
     AWS_REGION: us-east-1
-    ECR_REPOSITORY: tech-challanger-4-prd-lambda-repo-tech-challenger-4-prd
-    FUNCTION_NAME: tech-challenger-4-prd-api-stock-prediction
+    ECR_REPOSITORY: sub-challanger-prd-lambda-repo-prd
+    FUNCTION_NAME: sub-challanger-prd-api-stock-prediction
 
 jobs:
     deploy:

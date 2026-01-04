@@ -1,9 +1,10 @@
 ### Buckets dos dados
 resource "aws_s3_bucket" "buckets" {
-  count  = length(var.bucket_names)
-  bucket = "${local.prefix}-${var.bucket_names[count.index]}-${var.account}"
-  tags   = local.common_tags
-  acl    = "private"
+  count         = length(var.bucket_names)
+  bucket        = "${local.prefix}-${var.bucket_names[count.index]}-${var.account}"
+  tags          = local.common_tags
+  acl           = "private"
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_versioning" "bucket_versioning" {

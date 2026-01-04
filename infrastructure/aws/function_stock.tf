@@ -4,7 +4,7 @@ resource "aws_lambda_function" "crawler_lambda" {
   description   = "Função Lambda para crawler de ações do Yahoo Finance"
   role          = aws_iam_role.lambda_decompress.arn
   package_type  = "Image"
-  image_uri     = "593793061865.dkr.ecr.us-east-1.amazonaws.com/tech-challanger-4-prd-lambda-repo-tech-challenger-4-prd:latest"
+  image_uri     = "${aws_ecr_repository.lambda_repo.repository_url}:latest"
   timeout       = 900
   memory_size   = 1024
   architectures = ["x86_64"]
