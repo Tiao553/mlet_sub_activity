@@ -88,3 +88,15 @@ resource "aws_instance" "app_server" {
     }
   )
 }
+
+resource "aws_eip" "mlflow_airflow_eip" {
+  instance = aws_instance.app_server.id
+  domain   = "vpc"
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "app_subchallanger_mlet03"
+    }
+  )
+}
