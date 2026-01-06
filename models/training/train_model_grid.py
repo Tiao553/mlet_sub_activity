@@ -149,7 +149,7 @@ def main():
     mlflow.set_tracking_uri(args.mlflow_uri)
     
     # Dynamic Experiment Name based on Business Keys
-    experiment_name = f"Experiment_{args.symbol}_{args.period}_{args.interval}_v2"
+    experiment_name = f"Experiment_{args.symbol}_{args.period}_{args.interval}"
     mlflow.set_experiment(experiment_name)
     
     import datetime
