@@ -43,7 +43,7 @@ Criar uma solução robusta que não apenas treine um modelo, mas gerencie seu c
 O projeto está implantado e acessível publicamente:
 
 - **API (Gateway Serverless)**: [https://mdrzylhavh.execute-api.us-east-1.amazonaws.com/prod/](https://mdrzylhavh.execute-api.us-east-1.amazonaws.com/prod/)
-- **Documentação da API (Swagger/Redoc)**: [http://54.82.227.100:8000/docs](http://54.82.227.100:8000/docs)
+- **Documentação da API (Swagger/Redoc)**: [https://mdrzylhavh.execute-api.us-east-1.amazonaws.com/prod//docs](https://mdrzylhavh.execute-api.us-east-1.amazonaws.com/prod//docs)
 - **MLflow UI**: [http://54.82.227.100:5000](http://54.82.227.100:5000)
 - **Airflow UI**: [http://54.82.227.100:8080](http://54.82.227.100:8080)
 
