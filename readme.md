@@ -1,6 +1,6 @@
 # Atividade Substitutiva da Pós-Graduação MLET03 da FIAP
 
-[link do video de apresentacao](https://youtu.be/v03U9tBDizg)
+[link do video de apresentacao](https://youtu.be/8pmkMUNIThI)
 
 > **Projeto de Operacionalização de Modelo de Previsão de Ações (Stock Prediction MLOps)**
 >
