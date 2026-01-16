@@ -52,31 +52,31 @@ resource "aws_instance" "app_server" {
               # Update and Install Dependencies
               apt-get update
               apt-get install -y docker.io git curl
-              
+
               # Install Docker Compose (V2)
               mkdir -p /usr/local/lib/docker/cli-plugins
               curl -SL https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
               chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-              
+
               # Enable Docker
               systemctl start docker
               systemctl enable docker
               usermod -aG docker ubuntu
-              
+
               # Setup Project
               mkdir -p /home/ubuntu/tech-challenge
               cd /home/ubuntu/tech-challenge
-              
+
               # Clone the repo (creates mlet_sub_activity directory)
               git clone https://github.com/Tiao553/mlet_sub_activity.git
-              
+
               # Enter the project directory
               cd mlet_sub_activity
-              
+
               # Fix Airflow permissions
               mkdir -p airflow/{dags,logs,plugins}
               chmod -R 777 airflow
-              
+
               # Initialize and start containers
               docker compose up -d
               EOF
@@ -87,6 +87,12 @@ resource "aws_instance" "app_server" {
       Name = "${local.prefix}-mlflow-airflow-server"
     }
   )
+
+  root_block_device {
+    volume_size = 40
+    volume_type = "gp3"
+    encrypted   = true
+  }
 }
 
 resource "aws_eip" "mlflow_airflow_eip" {

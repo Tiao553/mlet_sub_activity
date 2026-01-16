@@ -1,69 +1,69 @@
-# Technical Decisions & Experiment Documentation
+# Decisões Técnicas & Documentação de Experimentos
 
-## 1. Architecture Overview
+## 1. Visão Geral da Arquitetura
 
-This project implements a robust Machine Learning pipeline for time-series forecasting of stock prices (specifically `VALE3.SA`). The system is designed to be **model-agnostic** and **parameter-driven**, allowing an API to dynamically select the best pre-trained model based on the requested data context (Period and Interval).
+Este projeto implementa um pipeline robusto de Machine Learning para previsão de séries temporais de preços de ações. O sistema foi projetado para ser **model-agnostic** (agnóstico a modelo) e **parameter-driven** (guiado por parâmetros), permitindo que uma API selecione dinamicamente o melhor modelo pré-treinado com base no contexto de dados solicitado (Símbolo, Período e Intervalo).
 
-### Key Components
+### Componentes Chave
 
-- **Experiment Runner (`models/run_grid_search.py`)**: Orchestrates a comprehensive search across parameter combinations.
-- **Unified Trainer (`models/train_model_grid.py`)**: A versatile script supporting both **TensorFlow** and **PyTorch**, handling data preprocessing, training, and MLflow logging.
-- **Dynamic Infrastructure (`scripts/get_mlflow_uri.py`)**: Automatically detects the MLflow tracking server location, supporting both local development and AWS EC2 deployments without code changes.
-- **reporting Engine (`scripts/generate_report.py`)**: Automates the selection of the best model and generates human-readable justification reports.
+- **Executor de Experimentos (`models/run_grid_search.py`)**: Orquestra uma busca abrangente através de combinações de parâmetros (Grid Search).
+- **Treinador Unificado (`models/train_model_grid.py`)**: Um script versátil que suporta tanto **TensorFlow** quanto **PyTorch**, lidando com pré-processamento de dados, treinamento e logging no MLflow.
+- **Infraestrutura Dinâmica (`scripts/get_mlflow_uri.py`)**: Detecta automaticamente a localização do servidor de rastreamento do MLflow, suportando tanto desenvolvimento local quanto deployments na AWS EC2 sem alterações de código.
+- **Motor de Relatórios (`scripts/generate_report.py`)**: Automatiza a seleção do melhor modelo e gera relatórios de justificativa legíveis por humanos.
 
-## 2. Model Selection Logic
+## 2. Lógica de Seleção de Modelo
 
-We support two primary Deep Learning frameworks to leverage their respective strengths:
+Suportamos dois frameworks primários de Deep Learning para aproveitar suas respectivas forças:
 
 ### TensorFlow (Keras)
 
-- **Use Case**: Rapid prototyping and production deployment via standard SavedModel formats.
-- **Architectures**:
-  - `LSTM`: Standard Long Short-Term Memory for capturing temporal dependencies.
-  - `GRU`: Gated Recurrent Unit, often faster to train with similar performance.
-  - `Bidirectional LSTM`: captures context from both past and future (in training sequences), often yielding better trend detection.
+- **Caso de Uso**: Prototipagem rápida e deployment em produção via formatos SavedModel padrão.
+- **Arquiteturas**:
+  - `LSTM`: Long Short-Term Memory padrão para capturar dependências temporais.
+  - `GRU`: Gated Recurrent Unit, frequentemente mais rápido para treinar com performance similar.
+  - `Bidirectional LSTM`: Captura contexto tanto do passado quanto do futuro (em sequências de treinamento), frequentemente resultando em melhor detecção de tendências.
 
 ### PyTorch
 
-- **Use Case**: Research-oriented experiments and fine-grained control over training loops.
-- **Architectures**: Implements equivalent LSTM/GRU/BiLSTM structures to allow direct performance comparison with TensorFlow/Keras.
+- **Caso de Uso**: Experimentos orientados a pesquisa e controle refinado sobre loops de treinamento.
+- **Arquiteturas**: Implementa estruturas equivalentes de LSTM/GRU/BiLSTM para permitir comparação direta de performance com TensorFlow/Keras.
 
-### "Switch Case" Selection Strategy
+### Estratégia de Seleção "Switch Case"
 
-The core business logic requires the API to serve the best model for a specific `Period` (e.g., 7 days) and `Interval` (e.g., 1 minute).
+A lógica de negócio central requer que a API sirva o melhor modelo para um `Período` específico (ex: 1 ano) e `Intervalo` (ex: 1 dia).
 
-- We train models for **all valid combinations** of these business keys.
-- The `generate_report.py` script queries MLflow to find the run with the **Lowest RMSE** for each `(Symbol, Period, Interval)` tuple.
-- This "Winner" is tagged and its Artifact URI is used by the API.
+- Treinamos modelos para **todas as combinações válidas** dessas chaves de negócio.
+- O script `promote_model.py` consulta o MLflow para encontrar a execução (run) com o **Menor RMSE** para cada tupla `(Símbolo, Período, Intervalo)`.
+- Este "Vencedor" recebe a tag `@champion` e sua URI de Artefato é usada pela API para carregar o modelo.
 
-## 3. Justification for Chosen Parameters
+## 3. Justificativa para Parâmetros Escolhidos
 
-### Data Parameters
+### Parâmetros de Dados
 
-- **Sequence Length (24 vs 60)**:
-  - *24*: Captures short-term momentum (e.g., last 24 minutes). reacting quickly to volatility.
-  - *60*: Captures longer-term trends (e.g., last hour), smoothing out noise.
-- **Feature Set**:
-  - *Full*: Includes MACD, RSI, Bollinger Bands, and OBV. We empirically found that including volume-weighted indicators (`OBV`, `VWAP`) improves prediction accuracy for liquid stocks like VALE3.
+- **Tamanho da Sequência (Sequence Length - 24 vs 60)**:
+  - *24*: Captura momemtum de curto prazo (ex: últimos 24 minutos/dias). Reage rapidamente à volatilidade.
+  - *60*: Captura tendências de longo prazo (ex: última hora/bimestre), suavizando ruídos.
+- **Conjunto de Features**:
+  - *Completo*: Inclui Preço de Fechamento, MACD, RSI, Bandas de Bollinger e OBV. Empiricamente, descobrimos que incluir indicadores ponderados por volume (`OBV`, `VWAP`) melhora a precisão da predição para ações líquidas como VALE3 e PETR4.
 
-### Training Parameters
+### Parâmetros de Treinamento
 
-- **Optimizer**: Adam is selected as the default due to its adaptive learning rate properties, which generally converge faster than SGD for RNNs.
-- **Loss Function**: MSE (Mean Squared Error) is favored over MAE for training to penalize large outliers more heavily, which is critical in financial risk management.
+- **Otimizador**: Adam é selecionado como padrão devido às suas propriedades de taxa de aprendizado adaptativa, que geralmente convergem mais rápido que SGD para RNNs.
+- **Função de Perda (Loss Function)**: MSE (Mean Squared Error) é favorecido sobre MAE para treinamento para penalizar grandes erros (outliers) mais fortemente, o que é crítico na gestão de risco financeiro.
 
-## 4. Accessing Artifacts
+## 4. Acessando Artefatos
 
-All experiments are logged to MLflow.
+Todos os experimentos são logados no MLflow.
 
-- **MLflow UI**: Access at port 5000 (e.g., `http://localhost:5000` or `http://<EC2-IP>:5000`).
-- **Artifacts**:
-  - **Models**: Stored as `.h5` (TF) or `.pth` (Torch) files within the run's artifact directory.
-  - **Plots**: `prediction.png` shows the Test Set vs Prediction visualization for quick visual validation.
+- **MLflow UI**: Acesso na porta 5000 (ex: `http://localhost:5000` ou `http://54.82.227.100:5000`).
+- **Artefatos**:
+  - **Modelos**: Armazenados como arquivos `.h5` (TF) ou `.pth` (Torch) dentro do diretório de artefatos da execução, hospedados no S3.
+  - **Gráficos**: `prediction.png` mostra a visualização do Conjunto de Teste vs Predição para validação visual rápida.
 
-## 5. Automation & DevOps
+## 5. Automação & DevOps
 
-- **IP Resolution**: The system uses `IMDSv2` to securely fetch EC2 public IPs. This prevents hardcoding IPs in the codebase, enabling immutable infrastructure deployments.
-- **Git Sync**: The project uses `git-sync` sidecars in Docker to keep the code fresh on the training servers.
+- **Resolução de IP**: O sistema usa `IMDSv2` para buscar IPs públicos da EC2 de forma segura. Isso previne hardcoding de IPs no código, permitindo deployments de infraestrutura imutável.
+- **Git Sync**: O projeto usa sidecars `git-sync` no Docker para manter o código fresco nos servidores de orquestração (Airflow) sem necessidade de reconstruir imagens constantemente.
 
 ---
-*Generated by Antigravity Agent*
+*Gerado pelo Agente Antigravity*

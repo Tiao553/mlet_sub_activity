@@ -1,18 +1,22 @@
-from app.config.logger import setup_logger
-
 import logging
 import time
 from datetime import datetime
 from typing import List, Optional, Union
 
 import yfinance as yf
+from app.core.logger import setup_logger
 
 logger = setup_logger("stock_data_service")
 
-def normalize_date_field(field: Union[List[int], int, None]) -> Optional[Union[str, List[str]]]:
+
+def normalize_date_field(
+    field: Union[List[int], int, None]
+) -> Optional[Union[str, List[str]]]:
     """Normaliza timestamps (ou listas) para strings 'YYYY-MM-DD HH:MM:SS' UTC."""
     if isinstance(field, list):
-        return [datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S") for ts in field]
+        return [
+            datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S") for ts in field
+        ]
     if isinstance(field, (int, float)):
         return datetime.utcfromtimestamp(field).strftime("%Y-%m-%d %H:%M:%S")
     return None
@@ -32,7 +36,9 @@ def get_stock_data(
     if end_date is None:
         end_date = datetime.utcnow().strftime("%Y-%m-%d")
 
-    logger.info(f"[get_stock_data] Símbolo={symbol} de {start_date} até {end_date} intervalo:({interval}) periodo:({period}) auto_adjust:({auto_adjust})")
+    logger.info(
+        f"[get_stock_data] Símbolo={symbol} de {start_date} até {end_date} intervalo:({interval}) periodo:({period}) auto_adjust:({auto_adjust})"
+    )
 
     ticker = yf.Ticker(symbol)
     df = ticker.history(
@@ -63,14 +69,16 @@ def get_stock_data(
 
     data_evolution = []
     for dt, row in df.iterrows():
-        data_evolution.append({
-            "datetime": dt.strftime("%Y-%m-%d %H:%M:%S"),
-            "open": float(row["Open"]),
-            "high": float(row["High"]),
-            "low": float(row["Low"]),
-            "close": float(row["Close"]),
-            "volume": int(row["Volume"]),
-        })
+        data_evolution.append(
+            {
+                "datetime": dt.strftime("%Y-%m-%d %H:%M:%S"),
+                "open": float(row["Open"]),
+                "high": float(row["High"]),
+                "low": float(row["Low"]),
+                "close": float(row["Close"]),
+                "volume": int(row["Volume"]),
+            }
+        )
 
     result = {
         "symbol": symbol,

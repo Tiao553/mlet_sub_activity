@@ -1,7 +1,7 @@
 locals {
   database_to_paths = {
-    "dl-raw-zone"      = "s3://tech-challanger-4-prd-raw-zone-593793061865/*"
-    "dl-delivery-zone" = "s3://tech-challanger-4-prd-delivery-zone-593793061865/*"
+    "dl-raw-zone"      = "s3://${local.prefix}-raw-zone-${var.account}/*"
+    "dl-delivery-zone" = "s3://${local.prefix}-delivery-zone-${var.account}/*"
   }
 }
 

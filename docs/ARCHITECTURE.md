@@ -1,47 +1,57 @@
-# 🏗️ Architecture
+# 🏗️ Arquitetura
 
-This project utilizes a cloud-native architecture on AWS to serve ML models and orchestrate pipelines.
+Este projeto utiliza uma arquitetura nativa em nuvem na AWS para servir modelos de ML e orquestrar pipelines.
 
-## ☁️ Cloud Infrastructure (AWS)
+## ☁️ Infraestrutura em Nuvem (AWS)
 
-The infrastructure is provisioned as code (IaC) using **HashiCorp Terraform**.
+A infraestrutura é provisionada como código (IaC) usando **HashiCorp Terraform**.
 
-### Components
+### Componentes
 
-- **Compute (EC2)**: A `t3.medium` instance hosting the Docker stack.
-- **Network (VPC)**: Custom VPC with a public subnet, Internet Gateway, and Route Table.
-- **Security (SG)**:
-  - `22` (SSH): Open for management.
-  - `5000` (MLflow): Open for ML tracking UI.
-  - `8080` (Airflow): Open for Workflow UI.
-- **Storage (S3)**:
-  - `raw-zone`: Storage for raw data.
-  - `delivery-zone`: Storage for processed data.
-  - `mlflow-artifacts`: Dedicated bucket for ML model artifacts.
-- **IAM**: EC2 Instance Profile with read/write access to the specific S3 buckets.
+- **Computação (EC2)**: Uma instância `t3.medium` hospedando a stack Docker.
+- **Rede (VPC)**: VPC personalizada com uma subnet pública, Internet Gateway e Route Table.
+- **Segurança (SG)**:
+  - `22` (SSH): Aberto para gerenciamento (Recomendado restringir ao IP do admin).
+  - `5000` (MLflow): Aberto para a UI de rastreamento de ML.
+  - `8080` (Airflow): Aberto para a UI de Workflow.
+  - `8000` (FastAPI): Aberto para requisições de API.
+- **Armazenamento (S3)**:
+  - `mlet-sub-challanger-raw-data-tf`: Zona de aterrissagem (Raw) para dados buscados do Yahoo Finance.
+  - `mlet-sub-challanger-delivery-data-tf`: Dados processados prontos para treinamento (Trusted/Refined).
+  - `mlet-sub-challanger-mlflow-artifacts-tf`: Bucket dedicado para artefatos de modelos e rastreamento de experimentos.
+- **IAM**: Perfil de Instância EC2 com acesso de leitura/escrita a esses buckets S3 específicos.
 
-## 🐳 Application Stack (Docker)
+## 🐳 Stack de Aplicação (Docker)
 
-The application runs as a containerized stack managed by **Docker Compose**.
+A aplicação roda como uma stack containerizada gerenciada pelo **Docker Compose**.
 
-### Services
+### Serviços
 
-1. **MLflow Server**:
-   - Tracks experiments and models.
-   - Backend Store: Postgres.
-   - Artifact Store: **AWS S3** (`s3://mlflow-artifacts`).
+1. **Servidor MLflow**:
+   - Rastreia experimentos, métricas e modelos.
+   - Banco de Dados (Backend Store): Postgres.
+   - Armazenamento de Artefatos: **AWS S3** (`s3://...-mlflow-artifacts-tf`).
 2. **Airflow**:
-   - Orchestrates data pipelines and model training.
-   - Backend Store: Postgres.
-   - Components: Webserver, Scheduler, Init.
-   - **Git-Sync**: Sidecar container that synchronizes DAGs/Plugins from GitHub (`https://github.com/Tiao553/mlet_sub_activity.git`) to a shared volume (`git-sync-data`).
+   - Orquestra pipelines de dados e retreinamento de modelos.
+   - Banco de Dados (Backend Store): Postgres.
+   - Componentes: Webserver, Scheduler, Init.
+   - **Git-Sync**: Container "sidecar" que sincroniza DAGs/Plugins do GitHub (`https://github.com/Tiao553/mlet_sub_activity.git`) para um volume compartilhado (`git-sync-data`).
 3. **PostgreSQL**:
-   - Two distinct containers for MLflow and Airflow metadata.
+   - Dois containers distintos para metadados do MLflow e Airflow.
+4. **API (FastAPI)**:
+   - Interface pública para predições.
+   - Consome modelos diretamente do S3 via MLflow.
 
-## 🔄 Workflow
+## 🔄 Fluxo de Trabalho (Workflow)
 
-1. **Deployment**: `deploy_mlflow_stack.sh` provisions the EC2 instance.
-2. **Initialization**: `user_data` script installs Docker, clones the repo, fixes permissions, and starts `docker compose up`.
-3. **DAG Updates**: Pushing to the `main` branch of the repository automatically updates DAGs in Airflow (approx. 30s delay) via the Git-Sync sidecar.
-4. **Pipelines**: Airflow DAGs run ML tasks, logging metrics and models to MLflow.
-5. **Artifacts**: Models are physically stored in S3, accessible via the MLflow UI.
+1. **Deploy**: `deploy_mlflow_stack.sh` provisiona a instância EC2.
+2. **Inicialização**: O script `user_data` instala Docker, clona o repositório, corrige permissões e inicia `docker compose up`.
+3. **Atualizações de DAG**: Fazer push na branch `main` do repositório atualiza automaticamente as DAGs no Airflow (atraso de aprox. 30s) via sidecar Git-Sync.
+4. **Pipelines**: DAGs do Airflow executam tarefas de ML, logando métricas e modelos no MLflow.
+5. **Artefatos**: Modelos são fisicamente armazenados no S3, acessíveis via UI do MLflow e API.
+
+## 🔗 Documentação Relacionada
+
+- [Workflow de MLOps](MLOPS_WORKFLOW.md)
+- [Fluxo da API](API_FLOW.md)
+- [Guia de Operações](OPERATIONS.md)

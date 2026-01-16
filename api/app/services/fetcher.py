@@ -1,27 +1,20 @@
-import json
-import requests
-import pandas as pd
 from datetime import datetime
-from typing import Optional, Dict, Tuple
-from app.config.logger import setup_logger
+from typing import Dict, Optional, Tuple
+
+import pandas as pd
+from app.core.config import settings
+from app.core.logger import setup_logger
+from app.services.s3 import (read_csv_from_s3, read_json_from_s3,
+                             write_csv_to_s3, write_json_to_s3)
 from app.services.stock_data import get_stock_data
 
+logger = setup_logger("fetcher_service")
 
-from app.services.s3_utils import (
-    read_json_from_s3,
-    write_json_to_s3,
-    read_csv_from_s3,
-    write_csv_to_s3,
-)
-
-logger = setup_logger("fetcher")
-
-# Exemplo de bucket e prefixo (pode vir de config/variável ambiente)
-BUCKET_NAME = "tech-challanger-4-prd-raw-zone-593793061865"
+# Use bucket from settings
+BUCKET_NAME = settings.S3_BUCKET_NAME
 
 
 def read_checkpoint_s3(bucket: str, key: str) -> Optional[Dict[str, datetime]]:
-
     """
     Lê checkpoint JSON do S3.
     Retorna dicionário com timestamps ou None.
@@ -42,25 +35,35 @@ def read_checkpoint_s3(bucket: str, key: str) -> Optional[Dict[str, datetime]]:
         logger.warning(f"Erro ao ler checkpoint JSON do S3 em {key}: {e}")
         return None
 
-def write_checkpoint_s3(bucket: str, key: str, new_first: datetime, new_last: datetime) -> None:
+
+def write_checkpoint_s3(
+    bucket: str, key: str, new_first: datetime, new_last: datetime
+) -> None:
     """
     Grava checkpoint JSON no S3.
     """
-    logger.info(f'Gravando checkpoint no S3 com last_timestamp = {new_last} e start_timestamp = {new_first}')
+    logger.info(
+        f"Gravando checkpoint no S3 com last_timestamp = {new_last} e start_timestamp = {new_first}"
+    )
     payload = {
         "start_timestamp": new_first.strftime("%Y-%m-%d %H:%M:%S"),
         "last_timestamp": new_last.strftime("%Y-%m-%d %H:%M:%S"),
     }
     write_json_to_s3(bucket, key, payload)
 
-def fetch_and_save_s3(symbol: str,
-                      start_date: Optional[str] = None,
-                      end_date: Optional[str] = None,
-                      interval: str = "1m",
-                      period: Optional[str] = "1d",
-                      auto_adjust: bool = True) -> Tuple[str, int]:
+
+def fetch_and_save_s3(
+    symbol: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    interval: str = "1m",
+    period: Optional[str] = "1d",
+    auto_adjust: bool = True,
+) -> Tuple[str, int]:
     try:
-        logger.info(f"[fetch_and_save_s3] Símbolo={symbol}, de {start_date} até {end_date}, intervalo:({interval}), período:({period}), auto_adjust:({auto_adjust})")
+        logger.info(
+            f"[fetch_and_save_s3] Símbolo={symbol}, de {start_date} até {end_date}, intervalo:({interval}), período:({period}), auto_adjust:({auto_adjust})"
+        )
 
         timestamp_exec = datetime.now().isoformat()
 
@@ -86,18 +89,18 @@ def fetch_and_save_s3(symbol: str,
         try:
             evo_existente = read_csv_from_s3(BUCKET_NAME, evo_key)
             arquivo_existe = True
-        except Exception as e:
-            logger.warning(f"[S3 Read] Arquivo {evo_key} não encontrado ou erro ao ler: {str(e)}")
+        except Exception:
+            # Not using warning here as it's expected for first run
             arquivo_existe = False
 
         if not arquivo_existe:
             write_csv_to_s3(BUCKET_NAME, evo_key, evo)
-            write_checkpoint_s3(BUCKET_NAME, checkpoint_key, menor_ts_lote, maior_ts_lote)
+            write_checkpoint_s3(
+                BUCKET_NAME, checkpoint_key, menor_ts_lote, maior_ts_lote
+            )
 
             logger.info(f"• Criando {symbol}_evolution.csv com {len(evo)} linhas.")
-            logger.info(f"  -> Checkpoint inicial: first={menor_ts_lote}, last={maior_ts_lote}")
 
-            logger.info(f"• Criando {symbol}_metadata.csv com metadados iniciais.")
             info = {k: data[k] for k in data if k != "data_evolution"}
             info_df = pd.DataFrame([{**{"timestamp": timestamp_exec}, **info}])
             write_csv_to_s3(BUCKET_NAME, meta_key, info_df)
@@ -126,13 +129,12 @@ def fetch_and_save_s3(symbol: str,
             updated_first = min(saved_first, novo_menor_ts)
             updated_last = max(saved_last, novo_maior_ts)
 
-            write_checkpoint_s3(BUCKET_NAME, checkpoint_key, updated_first, updated_last)
+            write_checkpoint_s3(
+                BUCKET_NAME, checkpoint_key, updated_first, updated_last
+            )
 
             logger.info(
-                f"• Adicionadas {len(novos)} linhas em '{symbol}_evolution.csv'.\n"
-                f"  -> First salvo: {saved_first}  |  Last salvo: {saved_last}\n"
-                f"  -> Menor do lote novo: {novo_menor_ts}  |  Maior do lote novo: {novo_maior_ts}\n"
-                f"  -> Checkpoint atualizado: first={updated_first}, last={updated_last}"
+                f"• Adicionadas {len(novos)} linhas em '{symbol}_evolution.csv'."
             )
         else:
             logger.info("• Nenhuma linha nova para adicionar (já processado).")
@@ -144,7 +146,9 @@ def fetch_and_save_s3(symbol: str,
             meta_atualizado = pd.concat([meta_existente, info_df], ignore_index=True)
             write_csv_to_s3(BUCKET_NAME, meta_key, meta_atualizado)
         except Exception as e:
-            logger.warning(f"[S3 Meta Write] Criando novo metadata para {symbol}: {str(e)}")
+            logger.warning(
+                f"[S3 Meta Write] Criando novo metadata para {symbol}: {str(e)}"
+            )
             info = {k: data[k] for k in data if k != "data_evolution"}
             info_df = pd.DataFrame([{**{"timestamp": timestamp_exec}, **info}])
             write_csv_to_s3(BUCKET_NAME, meta_key, info_df)
@@ -152,10 +156,8 @@ def fetch_and_save_s3(symbol: str,
         return f"Dados de '{symbol}' atualizados com sucesso.", 200
 
     except Exception as e:
-        logger.error(f"[fetch_and_save_s3] Falha no processamento do símbolo '{symbol}': {str(e)}", exc_info=True)
+        logger.error(
+            f"[fetch_and_save_s3] Falha no processamento do símbolo '{symbol}': {str(e)}",
+            exc_info=True,
+        )
         return f"Erro interno ao processar o símbolo '{symbol}'.", 500
-
-
-
-
-

@@ -9,4 +9,3 @@ resource "aws_ecr_repository" "lambda_repo" {
     local.common_tags,
   )
 }
-

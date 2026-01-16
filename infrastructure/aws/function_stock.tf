@@ -15,10 +15,11 @@ resource "aws_lambda_function" "crawler_lambda" {
 
   environment {
     variables = {
-      API_GATEWAY_ROOT_PATH = "/prod"
-      STAGE                 = "prod"
-      MLFLOW_TRACKING_URI   = "http://${aws_eip.mlflow_airflow_eip.public_ip}:5000"
-      MLFLOW_BUCKET_NAME    = "sub-challanger-prd-mlflow-artifacts-593793061865"
+      API_GATEWAY_ROOT_PATH              = "/prod"
+      STAGE                              = "prod"
+      MLFLOW_TRACKING_URI                = "http://${aws_eip.mlflow_airflow_eip.public_ip}:5000"
+      MLFLOW_BUCKET_NAME                 = "sub-challanger-prd-mlflow-artifacts-593793061865"
+      MLFLOW_PYFUNC_DISABLE_ENV_CREATION = "true"
     }
   }
 
